@@ -40,7 +40,7 @@ def main():
     norm_x = 1
     norm_y = 1
     distributeFailureFlag = True  # if true, distribute the failures evenly across the runs, if false, randomly distribute cases
-    dataType = 'energy'  # energy, alt_range, alt_vel
+    dataType = 'alt_range'  # energy, alt_range, alt_vel
 
     flagDownsample = True
     flagScale = True # if true, scale the data, if false, don't scale
@@ -186,19 +186,23 @@ def main():
         # 1024 + 128 + 128 = 1280 total samples
         proportions = [n_train / n_total, n_test / n_total, n_val / n_total]  # [train, val, test]
 
-        if 1 not in removeFlags:
+        if "escape" not in removeFlags:
             escape_train, escape_val, escape_test = split_proportional(escape_idx, proportions)
         else:
             escape_train, escape_val, escape_test = np.array([]), np.array([]), np.array([])
-        if 2 not in removeFlags:
+        if "crash" not in removeFlags:
             crash_train, crash_val, crash_test = split_proportional(crash_idx, proportions)
         else:
             crash_train, crash_val, crash_test = np.array([]), np.array([]), np.array([])
+        if "miss" not in removeFlags:
+            miss_train, miss_val, miss_test = split_proportional(miss_idx, proportions)
+        else:
+            miss_train, miss_val, miss_test = np.array([]), np.array([]), np.array([])
 
         # Step 3: Compute how many capture samples are needed to fill each set
-        train_needed = n_train - len(escape_train) - len(crash_train)
-        val_needed = n_test - len(escape_val) - len(crash_val)
-        test_needed = n_val - len(escape_test) - len(crash_test)
+        train_needed = n_train - len(escape_train) - len(crash_train) - len(miss_train)
+        val_needed = n_test - len(escape_val) - len(crash_val) - len(miss_val)
+        test_needed = n_val - len(escape_test) - len(crash_test) - len(miss_test)
 
         np.random.shuffle(capture_idx)
         capture_train = capture_idx[:train_needed]
@@ -206,9 +210,9 @@ def main():
         capture_test = capture_idx[train_needed + val_needed:train_needed + val_needed + test_needed]
 
         # Step 4: Combine and shuffle
-        train_indices = np.concatenate([escape_train, crash_train, capture_train])
-        val_indices = np.concatenate([escape_val, crash_val, capture_val])
-        test_indices = np.concatenate([escape_test, crash_test, capture_test])
+        train_indices = np.concatenate([escape_train, crash_train, miss_train, capture_train])
+        val_indices = np.concatenate([escape_val, crash_val, miss_val, capture_val])
+        test_indices = np.concatenate([escape_test, crash_test, miss_test, capture_test])
 
         np.random.shuffle(train_indices)
         np.random.shuffle(val_indices)
@@ -235,8 +239,23 @@ def main():
     # Results
     print(f"Train: {len(train_indices)}, Val: {len(val_indices)}, Test: {len(test_indices)}")
 
+    # Print number of captures, escapes, and misses in each list
+    def count_labels(indices):
+        labels_subset = [data_dict[f'sample{idx}']['label'] for idx in indices]
+        unique, counts = np.unique(labels_subset, return_counts=True)
+        label_counts = dict(zip(unique, counts))
+        return label_counts
+
+    train_counts = count_labels(train_indices)
+    val_counts = count_labels(val_indices)
+    test_counts = count_labels(test_indices)
+    print(f"Training set label counts: {train_counts}")
+    print(f"Validation set label counts: {val_counts}")
+    print(f"Testing set label counts: {test_counts}")
+
     # Put the train, val, and test indices into a single sequential list and save it as a json
     all_inds = np.concatenate([train_indices, val_indices, test_indices])
+    print(all_inds)
     output = {'sample_list': all_inds.tolist()}
 
     with open(f'{savePath}/{tag}_{Nruns}_inds_{suffix}.json', "w") as f:
@@ -265,20 +284,35 @@ def main():
 
     for ii, run in enumerate(train_indices):
         label = data_dict[f'sample{ii}']['label']
-        color = "C0" if label == "capture" else ("C1" if label == "escape" else "C2")
+        if label == "capture":
+            color = "C0"
+        elif label == "escape":
+            color = "C1"
+        else:  # Miss
+            color = "C2"
         axs[0].plot(data_mat[ii, :], color=color, marker='o')
     axs[0].set_title('Training Data')
 
     for ii, run in enumerate(val_indices):
         label = data_dict[f'sample{ii}']['label']
-        color = "C0" if label == "capture" else ("C1" if label == "escape" else "C2")
+        if label == "capture":
+            color = "C0"
+        elif label == "escape":
+            color = "C1"
+        else:  # Miss
+            color = "C2"
         axs[1].plot(data_mat[ii, :], color=color, marker='o')
     axs[1].set_title('Validation Data')
     axs[1].set_yticklabels([])
 
     for ii, run in enumerate(test_indices):
         label = data_dict[f'sample{ii}']['label']
-        color = "C0" if label == "capture" else ("C1" if label == "escape" else "C2")
+        if label == "capture":
+            color = "C0"
+        elif label == "escape":
+            color = "C1"
+        else:  # Miss
+            color = "C2"
         axs[2].plot(data_mat[ii, :], color=color, marker='o')
     axs[2].set_title('Testing Data')
     axs[2].set_yticklabels([])

@@ -43,9 +43,9 @@ def plot_latent_space_with_clusters(samples, labels, num_clusters, cluster_means
     # assert(len(markers) >= len(text_labels))
 
     unique_labels = torch.unique(labels)
-    print(len(unique_labels))
+    # print(len(unique_labels))
     for i in range(len(unique_labels)):
-        print(i)
+        # print(i)
         this_label = unique_labels[i]
         samples_i = samples_[labels == this_label]
         if samples_i.shape[0] > 0:
