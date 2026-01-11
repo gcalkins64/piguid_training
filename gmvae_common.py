@@ -326,8 +326,16 @@ class AerocaptureDataModuleCUDA(LightningDataModule):
         # ASSUMES DATA IS ALREADY DOWNSAMPLED AND SCALED
         for i in tqdm_notebook(range(self.n_samples)):
             j = sample_list[i]
-            this_data = np.array(data_dict[f'sample{j}']['energy'])[:]
+            this_data = np.array(data_dict[f'sample{j}']['alt_range'])[:]
             this_label = data_dict[f'sample{j}']['label']
+
+            # TODO change labels to ints rather than strings
+            if this_label == "capture":
+                this_label = 0
+            elif this_label == "escape":
+                this_label = 1
+            else:  # misses
+                this_label = 2
 
             if i >= 0 and i < self.n_train:
                 data_tr.append(torch.tensor(this_data, dtype=torch.float).to(self.device))
