@@ -6,19 +6,22 @@ import matplotlib.patches as mpatches
 from sklearn.decomposition import PCA
 import torch.nn as nn
 import torch.optim as optim
+import os
 from torch.distributions import Normal
 from pytorch_lightning import LightningDataModule
 import random
 from tqdm.notebook import tqdm_notebook
 import json
 from torch.utils.data import DataLoader
+import joblib
 
 def seabornSettings():
     sns.set_theme('notebook', style='whitegrid', palette='Paired', rc={"lines.linewidth": 2.5, "font.size": 10, "axes.titlesize": 12, "axes.labelsize": 12,'xtick.labelsize': 9.0, 'ytick.labelsize': 9.0, "font.family": "serif"})
     return
 
-def plot_latent_space_with_clusters(samples, labels, num_clusters, cluster_means, cluster_logvars, savepath,
-                                    text_labels, label_colors, data_colors, epoch_num=None, x_min=None, x_max=None, y_min=None, y_max=None, dpi=100):
+def plot_latent_space_with_clusters(samples, labels, num_clusters, cluster_means, cluster_logvars, savepath, data_labels, data_colors, cluster_labels, cluster_colors, epoch_num=None, x_min=None, x_max=None, y_min=None, y_max=None, dpi=100, titleTag=None):
+    # seabornSettings()
+    # savepath = dirname + postfix + 'latent_epoch' + str(epoch)
     latent_dim = samples.shape[1]
 
     if latent_dim == 2:
@@ -30,6 +33,8 @@ def plot_latent_space_with_clusters(samples, labels, num_clusters, cluster_means
     elif latent_dim > 2:
         pca = PCA(n_components=2)
         samples_ = pca.fit_transform(samples)
+        # Save the PCA object to a file
+        joblib.dump(pca, os.path.join('/Users/gracecalkins/Local_Documents/local_code/pipag/data', 'pca_model_uni.pkl'))
         cluster_means_ = pca.transform(cluster_means)
         A = pca.components_  # projection matrix
         C = torch.diag_embed(torch.exp(cluster_logvars)) # covariance matrix [num_clusters, latent_dim, latent_dim]
@@ -39,23 +44,17 @@ def plot_latent_space_with_clusters(samples, labels, num_clusters, cluster_means
         cluster_angles_ = np.arctan(u[:, 0, 1] / u[:, 0, 0])
 
     fig, ax = plt.subplots(figsize=(6.5,4))
-    markers = ['o', '^', "s", "d", "+", "*", "v", "x", "H", "p", "D", "P", "X"]
-    # assert(len(markers) >= len(text_labels))
+    markers = ['o', '^', "s", "d", 'p', '*']
+    assert(len(markers) >= len(data_labels))
 
-    unique_labels = torch.unique(labels)
-    # print(len(unique_labels))
-    for i in range(len(unique_labels)):
-        # print(i)
-        this_label = unique_labels[i]
-        samples_i = samples_[labels == this_label]
+    for i in range(len(data_labels)):
+        samples_i = samples_[labels == i]
         if samples_i.shape[0] > 0:
-          ax.scatter(samples_i[:, 0], samples_i[:, 1], marker=markers[i], s=50, label=text_labels[i], color=data_colors[i])
+          ax.scatter(samples_i[:, 0], samples_i[:, 1], marker=markers[i], s=50, label=data_labels[i], color=data_colors[i])
 
     for i in range(num_clusters):
-        ax.plot(cluster_means_[i, 0], cluster_means_[i, 1], 'x', markersize=12, label=text_labels[i]+r' $\mu$', color=label_colors[i])
-        ellipse2 = mpatches.Ellipse(xy=cluster_means_[i], width=4.0 * cluster_stds_[i, 0],
-                                    height=4.0 * cluster_stds_[i, 1],  angle=cluster_angles_[i] * 180 / np.pi,
-                                    label=text_labels[i]+r' $2\sigma$', color=label_colors[i], alpha=0.5)
+        ax.plot(cluster_means_[i, 0], cluster_means_[i, 1], 'x', markersize=12, label=cluster_labels[i]+r' $\mu$', color=cluster_colors[i])
+        ellipse2 = mpatches.Ellipse(xy=cluster_means_[i], width=4.0 * cluster_stds_[i, 0],  height=4.0 * cluster_stds_[i, 1],  angle=cluster_angles_[i] * 180 / np.pi, label=cluster_labels[i]+r' $2\sigma$', color=cluster_colors[i], alpha=0.5)
         ax.add_patch(ellipse2)
 
     if latent_dim == 2:
@@ -75,7 +74,7 @@ def plot_latent_space_with_clusters(samples, labels, num_clusters, cluster_means
     if epoch_num is not None:
         plt.title("Latent Space Epoch {epoch_num}".format(epoch_num=epoch_num))
     else:
-        plt.title("Latent Space")
+        plt.title("Latent Space"+titleTag)
     fig.tight_layout()
     fig.savefig(savepath + '.png', dpi=dpi)
     plt.close()
@@ -382,3 +381,16 @@ class AerocaptureDataModuleCUDA(LightningDataModule):
             num_workers=self.num_workers,
             worker_init_fn=seed_worker,
             generator=self.generator)
+
+def loadEncoderAndParams(path, suffix, data_dim, latent_dim, hidden_dims, oldFlag=False):
+    encoder = Encoder(data_dim=data_dim, latent_dim=latent_dim, hidden_dims=hidden_dims).to("cpu")
+    # print(encoder)
+    encoder.load_state_dict(torch.load(os.path.join(path, f'encoder_{suffix}.pt'),map_location=torch.device('cpu')))
+    logsigmasq = torch.load(os.path.join(path, f'gmm_params_logsigmasq_{suffix}.pt'),map_location=torch.device('cpu'))
+    mu = torch.load(os.path.join(path, f'gmm_params_mu_{suffix}.pt'),map_location=torch.device('cpu'))
+    pi = torch.load(os.path.join(path, f'gmm_params_pi_{suffix}.pt'),map_location=torch.device('cpu'))
+    em_reg = 1e-6
+    # Pack the parameters into the dictionary
+    params = {'pi_c': pi, 'mu_c': mu, 'logsigmasq_c': logsigmasq}
+
+    return encoder, params, em_reg

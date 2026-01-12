@@ -7,8 +7,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 sys.path.append("/Users/gracecalkins/Local_Documents/local_code/piguid")
 import torch
-from gmvae_encoder import *  # type: ignore
-from plotting import plot_latent_space_with_clusters, seabornSettings  # type: ignore
+from gmvae_common import *  # type: ignore
 import glob
 import re
 import joblib  # safer and more compact than pickle for sklearn models
@@ -20,14 +19,14 @@ def main():
     # Set your directory path
     basePath = "/Users/gracecalkins/Local_Documents/local_code/piguid_training/data/"
 
-    inputDataPath = "/Users/gracecalkins/Local_Documents/local_code/pipag_training/data/orion_mars_return_2500_data_alt_range_scaled_downsampled.json"
+    inputDataPath = "/Users/gracecalkins/Local_Documents/local_code/piguid_training/data/orion_mars_return_2500_data_alt_range_scaled_downsampled.json"
 
     saveTag = 'orion_mars_return'
 
-    prefix = "gmvae_orion_mars_return_20260111"
+    prefix = "gmvae_orion_mars_return_(20260111|20260112)"
 
-    LDs = [3]
-    NCs = [3]
+    LDs = [3,4,5]
+    NCs = [3,4,5,6,7]
 
     # load in json
     with open(inputDataPath, 'r') as f:
@@ -38,16 +37,27 @@ def main():
     samples = np.array([inputData[f'sample{i}']['alt_range'] for i in range(Nsamples)])
     # Get all samples labels
     labels = np.array([inputData[f'sample{i}']['label'] for i in range(Nsamples)])
+    # Convert labels to 0, 1, 2
+    for ii in range(Nsamples):
+        if labels[ii] == "capture":
+            labels[ii] = 0
+        elif labels[ii] == "escape":
+            labels[ii] = 1
+        elif labels[ii] == "miss":
+            labels[ii] = 2
+
+    labels = labels.astype(int)
+
     # Get probabilities
     capture_prob, escape_prob, impact_prob, miss_prob = 0, 0, 0, 0
     for ii in range(Nsamples):  # 0 capture, 1 escape, 2 impact
-        if labels[ii] == "capture":
+        if labels[ii] == 0:
             capture_prob += 1
-        elif labels[ii] == "impact":
+        elif labels[ii] == 3:
             impact_prob += 1
-        elif labels[ii] == "escape":
+        elif labels[ii] == 1:
             escape_prob += 1
-        elif labels[ii] == "miss":
+        elif labels[ii] == 2:
             miss_prob += 1
 
     # Normalize capture and escape probabilities
@@ -138,11 +148,7 @@ def main():
 
             encoded_samples = np.squeeze(np.array([t.detach().numpy() for t in encoded_samples]))
             names = ['Capture', 'Escape', 'Miss']
-            plot_latent_space_with_clusters(encoded_samples, labels, NC, params['mu_c'], params['logsigmasq_c'],
-                                            os.path.join(folder_path,
-                                                f'predicted_latent_clusters_{saveTag}_LD{LD}_NC{NC}'), names,
-                                            ['C1', 'C3', 'C5'], cluster_labels, cluster_colors, dpi=300,
-                                            titleTag=f" LD: {LD}, NC: {NC}")
+            plot_latent_space_with_clusters(encoded_samples, labels, NC, params['mu_c'], params['logsigmasq_c'],os.path.join(folder_path, f'predicted_latent_clusters_{saveTag}_LD{LD}_NC{NC}'), names,['C1', 'C3', 'C5'], cluster_labels, cluster_colors, dpi=300, titleTag=f"LD: {LD}, NC: {NC}")
             # plt.show()
 
             # compute true cluster probability by summing prob
@@ -157,7 +163,7 @@ def main():
                     pred_miss_prob += params['pi_c'][aa].detach().numpy()
             pred_capture_probs[ll, nn] = pred_capture_prob
             pred_escape_probs[ll, nn] = pred_escape_prob
-            pred_crash_probs[ll, nn] = pred_miss_prob
+            pred_miss_probs[ll, nn] = pred_miss_prob
 
             # pass all samples through the encoder and perform em step to see which cluster they are assigned to
             pred_labels = []
@@ -203,7 +209,7 @@ def main():
 
             false_capture_percent[ll, nn] = false_assignment_capture_percentage
             false_escape_percent[ll, nn] = false_assignment_escape_percentage
-            false_crash_percent[ll, nn] = false_assignment_miss_percentage
+            false_miss_percent[ll, nn] = false_assignment_miss_percentage
 
             # Plot input data energy colored by assigned cluster (pred_label)
             fig, ax = plt.subplots()
@@ -223,8 +229,8 @@ def main():
                         ax.plot(samples[ii], color='C5', alpha=0.5)
                     else:
                         ax.plot(samples[ii], color='C4', alpha=0.5)
-            ax.set_ylabel('Scaled Energy')
-            ax.set_xlabel('Downsample Index')
+            ax.set_ylabel('Altitude')
+            ax.set_xlabel('Downrange')
             ax.plot([], color='C0', label='Correctly Predicted Capture')
             ax.plot([], color='C2', label='Correctly Predicted Escape')
             ax.plot([], color='C4', label='Correctly Predicted Miss')
@@ -272,117 +278,129 @@ def main():
             axs[2].plot([], color='C10', label='Assigned to Capture')
             axs[2].plot([], color='C11', label='Assigned to Escape')
             for ax in axs:
-                ax.set_ylabel('Scaled Energy')
-                ax.set_xlabel('Downsample Index')
+                ax.set_ylabel('Altitude')
+                ax.set_xlabel('Downrange')
                 ax.axhline(0, color='black', linestyle='--')
                 ax.legend(loc='lower left')
             plt.suptitle(f"LD: {LD}, NC: {NC}")
             plt.tight_layout()
             plt.savefig(os.path.join(folder_path, f"breakout_predicted_clusters_{saveTag}_LD{LD}_NC{NC}.png"), dpi=300)
+            plt.close('all')
             # plt.show()
 
-        if len(LDs) == 1 or len(NCs) == 1:
-            print(f'"encoderPathX": "{folder_path}",')
-            print(f'"encoderSuffixX": "{suffix}", ')
-            print(f'"captureIndsX": {[i for i, val in enumerate(assigned_cluster_inds) if val == 0]}, ')
-            print(f'"escapeIndsX": {[i for i, val in enumerate(assigned_cluster_inds) if val == 1]}, ')
-            print(f'"crashIndsX": {[i for i, val in enumerate(assigned_cluster_inds) if val == 2]}, ')
+    if len(LDs) == 1 or len(NCs) == 1:
+        print(f'"encoderPathX": "{folder_path}",')
+        print(f'"encoderSuffixX": "{suffix}", ')
+        print(f'"captureIndsX": {[i for i, val in enumerate(assigned_cluster_inds) if val == 0]}, ')
+        print(f'"escapeIndsX": {[i for i, val in enumerate(assigned_cluster_inds) if val == 1]}, ')
+        print(f'"crashIndsX": {[i for i, val in enumerate(assigned_cluster_inds) if val == 2]}, ')
 
-        if len(LDs) > 1 or len(NCs) > 1:
-            # Print a booktabs latex table of the predicted capture probability for number of cluster and latent dimension
-            print("Predicted Capture Probabilities")
-            print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
-            print("\\toprule")
-            print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
-            print("\\midrule")
-            for ll, LD in enumerate(LDs):
-                print(f"{LD} & " + " & ".join(
-                    [f"{pred_capture_probs[ll, nn]:.4f}" for nn in range(len(NCs))]) + " \\\\")
-            print("\\bottomrule")
-            print("\\end{tabular}")
+    if len(LDs) > 1 or len(NCs) > 1:
+        # Print a booktabs latex table of the predicted capture probability for number of cluster and latent dimension
+        print("\\begin{table}[H]")
+        print("\\centering")
+        print("\\caption{Predicted Capture Probabilities}")
+        print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
+        print("\\toprule")
+        print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
+        print("\\midrule")
+        for ll, LD in enumerate(LDs):
+            print(f"{LD} & " + " & ".join(
+                [f"{pred_capture_probs[ll, nn]:.4f}" for nn in range(len(NCs))]) + " \\\\")
+        print("\\bottomrule")
+        print("\\end{tabular}")
+        print("\\end{table}\n")
 
-            # Print a booktabs latex table of the predicted escape probability for number of cluster and latent dimension
-            print("Predicted Escape Probabilities")
-            print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
-            print("\\toprule")
-            print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
-            print("\\midrule")
-            for ll, LD in enumerate(LDs):
-                print(f"{LD} & " + " & ".join(
-                    [f"{pred_escape_probs[ll, nn]:.4f}" for nn in range(len(NCs))]) + " \\\\")
-            print("\\bottomrule")
+        # Print a booktabs latex table of the predicted escape probability for number of cluster and latent dimension
+        print("\\begin{table}[H]")
+        print("\\centering")
+        print("\\caption{Predicted Escape Probabilities}")
+        print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
+        print("\\toprule")
+        print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
+        print("\\midrule")
+        for ll, LD in enumerate(LDs):
+            print(f"{LD} & " + " & ".join(
+                [f"{pred_escape_probs[ll, nn]:.4f}" for nn in range(len(NCs))]) + " \\\\")
+        print("\\bottomrule")
+        print("\\end{tabular}")
+        print("\\end{table}\n")
 
-            # Print a booktabs latex table of the predicted crash probability for number of cluster and latent dimension
-            print("Predicted Miss Probabilities")
-            print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
-            print("\\toprule")
-            print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
-            print("\\midrule")
-            for ll, LD in enumerate(LDs):
-                print(f"{LD} & " + " & ".join(
-                    [f"{pred_crash_probs[ll, nn]:.4f}" for nn in range(len(NCs))]) + " \\\\")
-            print("\\bottomrule")
+        # Print a booktabs latex table of the predicted crash probability for number of cluster and latent dimension
+        print("\\begin{table}[H]")
+        print("\\centering")
+        print("\\caption{Predicted Miss Probabilities}")
+        print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
+        print("\\toprule")
+        print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
+        print("\\midrule")
+        for ll, LD in enumerate(LDs):
+            print(f"{LD} & " + " & ".join(
+                [f"{pred_miss_probs[ll, nn]:.4f}" for nn in range(len(NCs))]) + " \\\\")
+        print("\\bottomrule")
+        print("\\end{tabular}")
+        print("\\end{table}\n")
 
-            # Print capture percent misassignment
-            print("\\begin{table}{H}")
-            print("\\centering")
-            print("\\caption{Predicted Capture Misassignments}")
-            print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
-            print("\\toprule")
-            print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
-            print("\\midrule")
-            for ll, LD in enumerate(LDs):
-                print(f"{LD} & " + " & ".join(
-                    [f"{false_capture_percent[ll, nn] * 100:.4f}" for nn in range(len(NCs))]) + " \\\\")
-            print("\\bottomrule")
-            print("\\end{tabular}")
-            print("\\end{table}")
+        # Print capture percent misassignment
+        print("\\begin{table}[H]")
+        print("\\centering")
+        print("\\caption{Predicted Capture Misassignments}")
+        print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
+        print("\\toprule")
+        print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
+        print("\\midrule")
+        for ll, LD in enumerate(LDs):
+            print(f"{LD} & " + " & ".join(
+                [f"{false_capture_percent[ll, nn] * 100:.4f}" for nn in range(len(NCs))]) + " \\\\")
+        print("\\bottomrule")
+        print("\\end{tabular}")
+        print("\\end{table}\n")
 
-            # Print escape percent misassignment
-            print("\\begin{table}{H}")
-            print("\\centering")
-            print("\\caption{Predicted Escape Misassignments}")
-            print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
-            print("\\toprule")
-            print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
-            print("\\midrule")
-            for ll, LD in enumerate(LDs):
-                print(f"{LD} & " + " & ".join(
-                    [f"{false_escape_percent[ll, nn] * 100:.4f}" for nn in range(len(NCs))]) + " \\\\")
-            print("\\bottomrule")
-            print("\\end{tabular}")
-            print("\\end{table}")
+        # Print escape percent misassignment
+        print("\\begin{table}[H]")
+        print("\\centering")
+        print("\\caption{Predicted Escape Misassignments}")
+        print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
+        print("\\toprule")
+        print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
+        print("\\midrule")
+        for ll, LD in enumerate(LDs):
+            print(f"{LD} & " + " & ".join(
+                [f"{false_escape_percent[ll, nn] * 100:.4f}" for nn in range(len(NCs))]) + " \\\\")
+        print("\\bottomrule")
+        print("\\end{tabular}")
+        print("\\end{table}\n")
 
-            # Print crash percent misassignment
-            print("\\begin{table}{H}")
-            print("\\centering")
-            print("\\caption{Predicted Miss Misassignments}")
-            print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
-            print("\\toprule")
-            print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
-            print("\\midrule")
-            for ll, LD in enumerate(LDs):
-                print(f"{LD} & " + " & ".join(
-                    [f"{false_crash_percent[ll, nn] * 100:.4f}" for nn in range(len(NCs))]) + " \\\\")
-            print("\\bottomrule")
-            print("\\end{tabular}")
-            print("\\end{table}")
+        # Print crash percent misassignment
+        print("\\begin{table}[H]")
+        print("\\centering")
+        print("\\caption{Predicted Miss Misassignments}")
+        print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
+        print("\\toprule")
+        print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
+        print("\\midrule")
+        for ll, LD in enumerate(LDs):
+            print(f"{LD} & " + " & ".join(
+                [f"{false_miss_percent[ll, nn] * 100:.4f}" for nn in range(len(NCs))]) + " \\\\")
+        print("\\bottomrule")
+        print("\\end{tabular}")
+        print("\\end{table}")
 
-            # Print average percent misassignment
-            print("\\begin{table}{H}")
-            print("\\centering")
-            print("\\caption{Average Misassignments}")
-            print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
-            print("\\toprule")
-            print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
-            print("\\midrule")
-            for ll, LD in enumerate(LDs):
-                print(f"{LD} & " + " & ".join(
-                    [f"{np.nanmean([false_crash_percent[ll, nn], false_escape_percent[ll, nn], false_capture_percent[ll, nn]]) * 100:.4f}"
-                        for nn in range(len(NCs))]) + " \\\\")
-            print("\\bottomrule")
-            print("\\end{tabular}")
-            print("\\end{table}")
+        # Print average percent misassignment
+        print("\\begin{table}[H]")
+        print("\\centering")
+        print("\\caption{Average Misassignments}")
+        print("\\begin{tabular}{l" + "c" * len(NCs) + "}")
+        print("\\toprule")
+        print("Latent Dim & " + " & ".join([str(NC) for NC in NCs]) + " \\\\")
+        print("\\midrule")
+        for ll, LD in enumerate(LDs):
+            print(f"{LD} & " + " & ".join(
+                [f"{np.nanmean([false_miss_percent[ll, nn], false_escape_percent[ll, nn], false_capture_percent[ll, nn]]) * 100:.4f}"
+                    for nn in range(len(NCs))]) + " \\\\")
+        print("\\bottomrule")
+        print("\\end{tabular}")
+        print("\\end{table}\n")
 
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()
