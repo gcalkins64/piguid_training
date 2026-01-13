@@ -38,9 +38,9 @@ def main():
     offset_x = 0
     offset_y = 0
     norm_x = 1
-    norm_y = 1
+    norm_y = 4.6e7  # Energy norm
     distributeFailureFlag = True  # if true, distribute the failures evenly across the runs, if false, randomly distribute cases
-    dataType = 'alt_vel'  # energy, alt_range, alt_vel
+    dataType = 'energy'  # energy, alt_range, alt_vel
     timeMode = 'huntest'  # huntest if only to beginning of huntest, final_phase if to beginning of final phase
 
     flagDownsample = True

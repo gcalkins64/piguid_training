@@ -19,6 +19,70 @@ def seabornSettings():
     sns.set_theme('notebook', style='whitegrid', palette='Paired', rc={"lines.linewidth": 2.5, "font.size": 10, "axes.titlesize": 12, "axes.labelsize": 12,'xtick.labelsize': 9.0, 'ytick.labelsize': 9.0, "font.family": "serif"})
     return
 
+def plot_latent_space_with_clusters_training(samples, labels, num_clusters, cluster_means, cluster_logvars, savepath,text_labels, label_colors, data_colors, epoch_num=None, x_min=None, x_max=None, y_min=None, y_max=None, dpi=100):
+    # seabornSettings()
+    # savepath = dirname + postfix + 'latent_epoch' + str(epoch)
+    latent_dim = samples.shape[1]
+
+    if latent_dim == 2:
+        samples_ = samples
+        cluster_means_ = cluster_means
+        cluster_stds_ = torch.exp(0.5 * cluster_logvars)
+        cluster_angles_ = torch.zeros(num_clusters)
+
+    elif latent_dim > 2:
+        pca = PCA(n_components=2)
+        samples_ = pca.fit_transform(samples)
+        cluster_means_ = pca.transform(cluster_means)
+        A = pca.components_  # projection matrix
+        C = torch.diag_embed(torch.exp(cluster_logvars)) # covariance matrix [num_clusters, latent_dim, latent_dim]
+        C_proj = np.matmul(np.matmul(A, C), A.T) # [num_clusters, 2, 2]
+        u, s, vh = np.linalg.svd(C_proj, full_matrices=True)
+        cluster_stds_ = np.sqrt(s)
+        cluster_angles_ = np.arctan(u[:, 0, 1] / u[:, 0, 0])
+
+    fig, ax = plt.subplots(figsize=(6.5,4))
+    markers = ['o', '^', "s", "d", "+", "*", "v", "x", "H", "p", "D", "P", "X"]
+    # assert(len(markers) >= len(text_labels))
+
+    unique_labels = torch.unique(labels)
+    # print(len(unique_labels))
+    for i in range(len(unique_labels)):
+        # print(i)
+        this_label = unique_labels[i]
+        samples_i = samples_[labels == this_label]
+        if samples_i.shape[0] > 0:
+          ax.scatter(samples_i[:, 0], samples_i[:, 1], marker=markers[i], s=50, label=text_labels[i], color=data_colors[i])
+
+    for i in range(num_clusters):
+        ax.plot(cluster_means_[i, 0], cluster_means_[i, 1], 'x', markersize=12, label=text_labels[i]+r' $\mu$', color=label_colors[i])
+        ellipse2 = mpatches.Ellipse(xy=cluster_means_[i], width=4.0 * cluster_stds_[i, 0],
+                                    height=4.0 * cluster_stds_[i, 1],  angle=cluster_angles_[i] * 180 / np.pi,
+                                    label=text_labels[i]+r' $2\sigma$', color=label_colors[i], alpha=0.5)
+        ax.add_patch(ellipse2)
+
+    if latent_dim == 2:
+        ax.set_xlabel('$z_1$')
+        ax.set_ylabel('$z_2$')
+    elif latent_dim > 2:
+        ax.set_xlabel('PC$(z)_1$')
+        ax.set_ylabel('PC$(z)_2$')
+
+    if x_min is not None:
+        ax.set_xlim([x_min, x_max])
+    if y_min is not None:
+        ax.set_ylim([y_min, y_max])
+    # ax.set_xlim([-90, 80])
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    # ax.legend(loc='best')
+    if epoch_num is not None:
+        plt.title("Latent Space Epoch {epoch_num}".format(epoch_num=epoch_num))
+    else:
+        plt.title("Latent Space")
+    fig.tight_layout()
+    fig.savefig(savepath + '.png', dpi=dpi)
+    plt.close()
+
 def plot_latent_space_with_clusters(samples, labels, num_clusters, cluster_means, cluster_logvars, savepath, data_labels, data_colors, cluster_labels, cluster_colors, epoch_num=None, x_min=None, x_max=None, y_min=None, y_max=None, dpi=100, titleTag=None):
     # seabornSettings()
     # savepath = dirname + postfix + 'latent_epoch' + str(epoch)
