@@ -325,7 +325,7 @@ class AerocaptureDataModuleCUDA(LightningDataModule):
         # ASSUMES DATA IS ALREADY DOWNSAMPLED AND SCALED
         for i in tqdm_notebook(range(self.n_samples)):
             j = sample_list[i]
-            this_data = np.array(data_dict[f'sample{j}']['alt_range'])[:]
+            this_data = np.array(data_dict[f'sample{j}']['energy'])[:]
             this_label = data_dict[f'sample{j}']['label']
 
             # TODO change labels to ints rather than strings

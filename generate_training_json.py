@@ -40,7 +40,8 @@ def main():
     norm_x = 1
     norm_y = 1
     distributeFailureFlag = True  # if true, distribute the failures evenly across the runs, if false, randomly distribute cases
-    dataType = 'alt_range'  # energy, alt_range, alt_vel
+    dataType = 'alt_vel'  # energy, alt_range, alt_vel
+    timeMode = 'huntest'  # huntest if only to beginning of huntest, final_phase if to beginning of final phase
 
     flagDownsample = True
     flagScale = True # if true, scale the data, if false, don't scale
@@ -74,12 +75,17 @@ def main():
         downrange = stat['GUID_RANGE_TO_GO']
 
         # We only want the trajectories to final phase if that exists (end of Upcontrol)
-        if not np.isnan(stat['phase_starts']['FINAL_PHASE_START']):
-            tF = stat['phase_starts']['FINAL_PHASE_START']
+        if timeMode == 'final_phase':
+            if not np.isnan(stat['phase_starts']['FINAL_PHASE_START']):
+                tF = stat['phase_starts']['FINAL_PHASE_START']
+                cutoff_ind = np.where(ts <= tF)[0][-1] + 1
+            else:
+                tF = ts[-1]
+                cutoff_ind = len(downrange)  # TODO because downrange is shorter than ts
+        else:  # Huntest, Huntest start time is defined for all trajectories
+            tF = stat['phase_starts']['HUNTEST_START']
             cutoff_ind = np.where(ts <= tF)[0][-1] + 1
-        else:
-            tF = ts[-1]
-            cutoff_ind = len(downrange)  # TODO because downrange is shorter than ts
+
 
         # ---- classification ----
         downrange = stat['GUID_RANGE_TO_GO']
@@ -156,7 +162,7 @@ def main():
         save_ind += 1
         labels.append(label)
 
-    suffix = f'{dataName}_{"scaled_" if flagScale else ""}{"downsampled" if flagDownsample else ""}'
+    suffix = f'{dataName}_{timeMode}_{"scaled_" if flagScale else ""}{"downsampled" if flagDownsample else ""}'
     with open(f'{savePath}/{tag}_{Nruns}_data_{suffix}.json', 'w') as f:
         json.dump(data_dict, f)
     Nruns = len(data_dict)
@@ -267,7 +273,7 @@ def main():
     for ii, run in enumerate(goodInds):
         label = data_dict[f'sample{ii}']['label']
         color = "C0" if label == "capture" else ("C1" if label == "escape" else "C2")
-        ax.plot(data_mat[ii, :], color=color, marker='o')
+        ax.plot(data_mat[ii, :], color=color, marker='o', alpha=0.3)
     line1 = plt.Line2D([0], [0], color='C0', label='Capture', marker='o')
     line2 = plt.Line2D([0], [0], color='C1', label='Escape', marker='o')
     line3 = plt.Line2D([0], [0], color='C2', label='Miss', marker='o')
@@ -290,7 +296,7 @@ def main():
             color = "C1"
         else:  # Miss
             color = "C2"
-        axs[0].plot(data_mat[ii, :], color=color, marker='o')
+        axs[0].plot(data_mat[ii, :], color=color, marker='o', alpha=0.3)
     axs[0].set_title('Training Data')
 
     for ii, run in enumerate(val_indices):
@@ -301,7 +307,7 @@ def main():
             color = "C1"
         else:  # Miss
             color = "C2"
-        axs[1].plot(data_mat[ii, :], color=color, marker='o')
+        axs[1].plot(data_mat[ii, :], color=color, marker='o', alpha=0.3)
     axs[1].set_title('Validation Data')
     axs[1].set_yticklabels([])
 
@@ -313,7 +319,7 @@ def main():
             color = "C1"
         else:  # Miss
             color = "C2"
-        axs[2].plot(data_mat[ii, :], color=color, marker='o')
+        axs[2].plot(data_mat[ii, :], color=color, marker='o', alpha=0.3)
     axs[2].set_title('Testing Data')
     axs[2].set_yticklabels([])
     axs[0].set_ylabel(ylabel)
@@ -337,8 +343,8 @@ def main():
             max_energy = energy
         mean_energy_0 += energy
     mean_energy_0 /= Nruns
-    print(f'Maximum initial energy: {max_energy}')
-    print(f'Mean initial energy: {mean_energy_0}')
+    print(f'Maximum initial value: {max_energy}')
+    print(f'Mean initial value: {mean_energy_0}')
 
 
 
