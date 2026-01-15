@@ -27,21 +27,22 @@ def main():
     savePath = '/Users/gracecalkins/Local_Documents/local_code/piguid_training/data'
     R_eq = 6371000 # m, Earth
     mu = 3.986e14,  # m^3/s^2
-    Nruns = 2500
+    Nruns = 2000 # 2500
 
-    # Near Escape
-    removeFlags = []  # "capture", "escape", "impact"
+    # Skip Entry
+    removeFlags = []  # "capture", "escape", "impact", "miss"
     tag = 'orion_mars_return'
-    dataPaths = ['/Users/gracecalkins/Local_Documents/local_code/piguid/data/20260110104244_dispersed_orion_mars_return_old_thetanm_R42_C2500_Ra2740']
+    # dataPaths = ['/Users/gracecalkins/Local_Documents/local_code/piguid/data/20260110104244_dispersed_orion_mars_return_old_thetanm_R42_C2500_Ra2740']
+    dataPaths = ['/Users/gracecalkins/Local_Documents/local_code/piguid/data/20260114145036_dispersed_orion_mars_return_R42_C2000_Ra2740']  # New run with higher altitude threshold
     # norm = 1  # alt range norm
     # norm = 46665617.798219256  # Energy norm
     offset_x = 0
     offset_y = 0
     norm_x = 1
-    norm_y = 4.6e7  # Energy norm
+    norm_y = 1  # Energy norm 4.6e7
     distributeFailureFlag = True  # if true, distribute the failures evenly across the runs, if false, randomly distribute cases
-    dataType = 'energy'  # energy, alt_range, alt_vel
-    timeMode = 'huntest'  # huntest if only to beginning of huntest, final_phase if to beginning of final phase
+    dataType = 'alt_range'  # energy, alt_range, alt_vel
+    timeMode = 'final_phase'  # huntest if only to beginning of huntest, final_phase if to beginning of final phase
 
     flagDownsample = True
     flagScale = True # if true, scale the data, if false, don't scale
@@ -72,7 +73,7 @@ def main():
         trajectory = trajectories[run]
         stat = stats[run]
         ts = trajectory['time'].to_numpy()
-        downrange = stat['GUID_RANGE_TO_GO']
+        downrange = stat['NEW_RANGE_TO_GO']  # TODO
 
         # We only want the trajectories to final phase if that exists (end of Upcontrol)
         if timeMode == 'final_phase':
@@ -96,13 +97,13 @@ def main():
         h_init = r[0] - R_eq
         h_final = r[-1] - R_eq
         v_final = vel[-1]
-        range_final = stat['GUID_RANGE_TO_GO'][-1] # s
+        range_final = downrange[-1] # s
 
         if h_final > h_init:
             label = 'escape'
         elif v_final > 1000.0:
             label = 'impact'
-        elif h_final < h_init and range_final > 500e3:  # add a miss but capture condition
+        elif h_final < h_init and abs(range_final) > 500e3:  # add a miss but capture condition
             label = 'miss'
         else:
             label = 'capture'
@@ -272,7 +273,12 @@ def main():
     fig, ax = plt.subplots()
     for ii, run in enumerate(goodInds):
         label = data_dict[f'sample{ii}']['label']
-        color = "C0" if label == "capture" else ("C1" if label == "escape" else "C2")
+        if label == "capture":
+            color = "C0"
+        elif label == "escape":
+            color = "C1"
+        else:  # Miss
+            color = "C2"
         ax.plot(data_mat[ii, :], color=color, marker='o', alpha=0.3)
     line1 = plt.Line2D([0], [0], color='C0', label='Capture', marker='o')
     line2 = plt.Line2D([0], [0], color='C1', label='Escape', marker='o')
@@ -289,37 +295,37 @@ def main():
     fig, axs = plt.subplots(1,3, figsize=(8,5), sharey=True)
 
     for ii, run in enumerate(train_indices):
-        label = data_dict[f'sample{ii}']['label']
+        label = data_dict[f'sample{run}']['label']
         if label == "capture":
             color = "C0"
         elif label == "escape":
             color = "C1"
         else:  # Miss
             color = "C2"
-        axs[0].plot(data_mat[ii, :], color=color, marker='o', alpha=0.3)
+        axs[0].plot(data_mat[run, :], color=color, marker='o', alpha=0.3)
     axs[0].set_title('Training Data')
 
     for ii, run in enumerate(val_indices):
-        label = data_dict[f'sample{ii}']['label']
+        label = data_dict[f'sample{run}']['label']
         if label == "capture":
             color = "C0"
         elif label == "escape":
             color = "C1"
         else:  # Miss
             color = "C2"
-        axs[1].plot(data_mat[ii, :], color=color, marker='o', alpha=0.3)
+        axs[1].plot(data_mat[run, :], color=color, marker='o', alpha=0.3)
     axs[1].set_title('Validation Data')
     axs[1].set_yticklabels([])
 
     for ii, run in enumerate(test_indices):
-        label = data_dict[f'sample{ii}']['label']
+        label = data_dict[f'sample{run}']['label']
         if label == "capture":
             color = "C0"
         elif label == "escape":
             color = "C1"
         else:  # Miss
             color = "C2"
-        axs[2].plot(data_mat[ii, :], color=color, marker='o', alpha=0.3)
+        axs[2].plot(data_mat[run, :], color=color, marker='o', alpha=0.3)
     axs[2].set_title('Testing Data')
     axs[2].set_yticklabels([])
     axs[0].set_ylabel(ylabel)
