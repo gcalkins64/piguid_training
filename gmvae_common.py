@@ -359,7 +359,7 @@ class AerocaptureDataModuleCUDA(LightningDataModule):
         self.generator = torch.Generator(device="cuda").manual_seed(SEED)
         self.SEED = SEED
 
-    def setup(self, stage=None, sample_list=None):
+    def setup(self, stage=None, sample_list=None, dataType='alt_range'):
         random.seed(self.SEED)
         np.random.seed(self.SEED)
         torch.manual_seed(self.SEED)
@@ -389,7 +389,7 @@ class AerocaptureDataModuleCUDA(LightningDataModule):
         # ASSUMES DATA IS ALREADY DOWNSAMPLED AND SCALED
         for i in tqdm_notebook(range(self.n_samples)):
             j = sample_list[i]
-            this_data = np.array(data_dict[f'sample{j}']['energy'])[:]
+            this_data = np.array(data_dict[f'sample{j}'][dataType])[:]
             this_label = data_dict[f'sample{j}']['label']
 
             # TODO change labels to ints rather than strings
