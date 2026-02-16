@@ -72,7 +72,7 @@ def main():
     for run in range(Nruns*len(dataPaths)):
         trajectory = trajectories[run]
         stat = stats[run]
-        ts = trajectory['time'].to_numpy()
+        ts  = trajectory['time'].to_numpy()
         downrange = stat['NEW_RANGE_TO_GO']  # TODO
 
         # We only want the trajectories to final phase if that exists (end of Upcontrol)

@@ -2,18 +2,25 @@ import numpy as np
 import os
 import json
 import sys
-sys.path.append("/Users/gracecalkins/Local_Documents/local_code/pipag/pipag_base")
-from gmvae_encoder import *  # type: ignore
+from gmvae_common import *  # type: ignore
 import matplotlib.pyplot as plt
 import seaborn as sns
 from torch.distributions import Normal
 import torch
-from plotting import seabornSettings # type: ignore
+# from plotting import seabornSettings # type: ignore
 import warnings
 import glob
 import re
 warnings.simplefilter("ignore", FutureWarning)
 
+
+def seabornSettings():
+    sns.set_style('whitegrid')
+    sns.color_palette("husl", 8)
+    sns.set_context("notebook", rc={"lines.linewidth": 2.5, "font.size": 10, "axes.titlesize": 12, "axes.labelsize": 12,
+                                    'xtick.labelsize': 9.0, 'ytick.labelsize': 9.0, "font.family": "serif"})
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams["mathtext.fontset"] = "dejavuserif"
 def main():
     seabornSettings()
     sns.set_palette("Paired")
@@ -22,11 +29,12 @@ def main():
 
     # Structure - run once for each input data, but can run multiple hyperparameters within each input file
     # INPUTS
-    inputDataPath = "/Users/gracecalkins/Local_Documents/local_code/pipag_training/data/orion_mars_return_2500_data_alt_range_scaled_downsampled.json"
-    prefix = "gmvae_orion_mars_return_(20260111|20260112)"
+    inputDataPath = "/Users/gracecalkins/Local_Documents/local_code/piguid_training/data/orion_mars_return_2000_data_alt_range_final_phase_scaled_downsampled.json"
+    # prefix = "gmvae_orion_mars_return_(20260111|20260112)"  # Original GMVAE for PredGuid training
+    prefix = "gmvae_orion_mars_return_(20260115)"
 
-    LDs = [3] #
-    NCs = [3]  #git s
+    LDs = [3,4,5] #
+    NCs = [3,4,5]  #git s
 
     # load in json
     with open(inputDataPath, 'r') as f:

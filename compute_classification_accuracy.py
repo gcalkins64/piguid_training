@@ -19,14 +19,16 @@ def main():
     # Set your directory path
     basePath = "/Users/gracecalkins/Local_Documents/local_code/piguid_training/data/"
 
-    inputDataPath = "/Users/gracecalkins/Local_Documents/local_code/piguid_training/data/orion_mars_return_2500_data_alt_range_scaled_downsampled.json"
+    inputDataPath = "/Users/gracecalkins/Local_Documents/local_code/piguid_training/data/orion_mars_return_2000_data_alt_range_final_phase_scaled_downsampled.json"
 
-    saveTag = 'orion_mars_return'
+    saveTag = 'orion_mars_return_fixed_alt_thres'
 
-    prefix = "gmvae_orion_mars_return_(20260111|20260112)"
+    # prefix = "gmvae_orion_mars_return_(20260111|20260112)"
+    # gmvae_orion_mars_return_final_phase_new_alt_thres_20260115_224337_L5_C4
+    prefix = "gmvae_orion_mars_return_final_phase_new_alt_thres_20260115"
 
     LDs = [3,4,5]
-    NCs = [3,4,5,6,7]
+    NCs = [3,4,5]
 
     # load in json
     with open(inputDataPath, 'r') as f:
@@ -148,7 +150,7 @@ def main():
 
             encoded_samples = np.squeeze(np.array([t.detach().numpy() for t in encoded_samples]))
             names = ['Capture', 'Escape', 'Miss']
-            plot_latent_space_with_clusters(encoded_samples, labels, NC, params['mu_c'], params['logsigmasq_c'],os.path.join(folder_path, f'predicted_latent_clusters_{saveTag}_LD{LD}_NC{NC}'), names,['C1', 'C3', 'C5'], cluster_labels, cluster_colors, dpi=300, titleTag=f"LD: {LD}, NC: {NC}")
+            plot_latent_space_with_clusters(encoded_samples, labels, NC, params['mu_c'], params['logsigmasq_c'],os.path.join(folder_path, f'predicted_latent_clusters_{saveTag}_LD{LD}_NC{NC}'), names,['C1', 'C3', 'C5'], cluster_labels, cluster_colors, dpi=300, titleTag=f" LD: {LD}, NC: {NC}")
             # plt.show()
 
             # compute true cluster probability by summing prob
@@ -224,8 +226,8 @@ def main():
                         ax.plot(samples[ii], color='C3', alpha=0.5)
                     else:
                         ax.plot(samples[ii], color='C2', alpha=0.5)
-                else:  # Crash
-                    if labels[ii] != labels[ii]:
+                else:  # Miss
+                    if pred_labels[ii] != labels[ii]:
                         ax.plot(samples[ii], color='C5', alpha=0.5)
                     else:
                         ax.plot(samples[ii], color='C4', alpha=0.5)
@@ -260,10 +262,10 @@ def main():
                         axs[1].plot(samples[ii], color='C9', alpha=0.5)
                     else:
                         axs[1].plot(samples[ii], color='C2', alpha=0.5)
-                else:  # Crash
-                    if labels[ii] == 0:  # Falsely assigned to capture
+                else:  # Miss
+                    if pred_labels[ii] == 0:  # Falsely assigned to capture
                         axs[2].plot(samples[ii], color='C10', alpha=0.5)
-                    elif labels[ii] == 1:  # Falsely assigned to escape
+                    elif pred_labels[ii] == 1:  # Falsely assigned to escape
                         axs[2].plot(samples[ii], color='C11', alpha=0.5)
                     else:
                         axs[2].plot(samples[ii], color='C4', alpha=0.5)
