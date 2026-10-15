@@ -210,3 +210,4 @@ __marimo__/
 VAE_arch_eval_combined/
 data/
 figs/
+.DS_Store
