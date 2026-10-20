@@ -27,13 +27,15 @@ def main():
     savePath = '/Users/gracecalkins/Local_Documents/local_code/piguid_training/data'
     R_eq = 6371000 # m, Earth
     mu = 3.986e14,  # m^3/s^2
-    Nruns = 2000 # 2500
+    Nruns = 1280 # 2500
 
     # Skip Entry
     removeFlags = []  # "capture", "escape", "impact", "miss"
-    tag = 'orion_mars_return'
+    # tag = 'orion_mars_return_GRAMdp1_gaussian'
+    tag = 'orion_mars_return_GRAMdp1_gumixture'
     # dataPaths = ['/Users/gracecalkins/Local_Documents/local_code/piguid/data/20260110104244_dispersed_orion_mars_return_old_thetanm_R42_C2500_Ra2740']
-    dataPaths = ['/Users/gracecalkins/Local_Documents/local_code/piguid/data/20260114145036_dispersed_orion_mars_return_R42_C2000_Ra2740']  # New run with higher altitude threshold
+    # dataPaths = ['/Users/gracecalkins/Local_Documents/local_code/piguid/data/20261019170731_dispersed_orion_mars_return_onbGRAMMean_truthGRAMdp1_all_disp_oblate_gu_mixture_UClow_R64_C1280_Ra2740']  # Gaussian (wrong settings) GRAM onboard and truth, and oblate planet
+    dataPaths = ['/Users/gracecalkins/Local_Documents/local_code/piguid/data/20261020082607_dispersed_orion_mars_return_onbGRAMMean_truthGRAMdp1_all_disp_oblate_gu_mixture_UClow_R64_C1280_Ra2740']  # GUM p=0.2, GRAM onboard and truth, and oblate planet
     # norm = 1  # alt range norm
     # norm = 46665617.798219256  # Energy norm
     offset_x = 0
@@ -351,6 +353,52 @@ def main():
     mean_energy_0 /= Nruns
     print(f'Maximum initial value: {max_energy}')
     print(f'Mean initial value: {mean_energy_0}')
+
+
+
+    # ============================================================
+    # SVD Analysis
+    # ============================================================
+    figPath = '/Users/gracecalkins/Local_Documents/local_code/piguid_training/figs'
+    figSize = (7, 4)
+    threshold = 0.99
+    latent_range = (2, 8)
+
+    # Perform SVD on downsampled trajectory data
+    samples = data_mat[:save_ind, :].T
+    U, S, V = np.linalg.svd(samples, full_matrices=False)
+    components = np.arange(1, len(S) + 1)
+
+    # Plot singular values
+    fig, ax = plt.subplots(figsize=figSize)
+    ax.plot(components, S, marker='o', color='C2', label='Singular Values', zorder=2)
+    ax.axvspan(*latent_range, color='gray', alpha=0.2, label='Latent Variable Range', zorder=0)
+    ax.set_yscale('log')
+    ax.set_xlim(0.5, len(S) + 0.5)
+    ax.set_xlabel('Feature Index')
+    ax.set_ylabel('Singular Values')
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(f'{figPath}/{tag}_{Nruns}_svd_singular_values.pdf', bbox_inches='tight')
+
+    # Plot cumulative explained variance
+    explained_variance = S**2 / np.sum(S**2)
+    cumulative_explained_variance = np.cumsum(explained_variance)
+    n_components = np.searchsorted(cumulative_explained_variance, threshold) + 1
+
+    fig, ax = plt.subplots(figsize=figSize)
+    ax.plot(components, cumulative_explained_variance, marker='o', color='C0', label='Cumulative Explained Variance', zorder=2)
+    ax.axhline(threshold, color='gray', linestyle='--', linewidth=1, label=f'{threshold*100:.0f}% Threshold')
+    ax.axvspan(*latent_range, color='gray', alpha=0.2, label='Latent Variable Range', zorder=0)
+    ax.set_xlabel('Number of Latent Variables')
+    ax.set_ylabel('Cumulative Explained Variance')
+    ax.set_xlim(0.5, len(S) + 0.5)
+    ax.set_ylim(0.6, 1.02)
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(f'{figPath}/{tag}_{Nruns}_svd_cumulative_explained_variance.pdf', bbox_inches='tight')
+
+    print(f'Number of components for {threshold*100:.0f}% explained variance: {n_components}')
 
 
 
