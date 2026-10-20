@@ -52,7 +52,8 @@ def plot_latent_space_with_clusters_training(samples, labels, num_clusters, clus
         this_label = unique_labels[i]
         samples_i = samples_[labels == this_label]
         if samples_i.shape[0] > 0:
-          ax.scatter(samples_i[:, 0], samples_i[:, 1], marker=markers[i], s=50, label=text_labels[i], color=data_colors[i])
+            outcome_labels = ['Capture', 'Escape', 'Miss']
+            ax.scatter(samples_i[:, 0], samples_i[:, 1], marker=markers[i], s=50, label=outcome_labels[int(this_label)], color=f'C{int(this_label) + 2}')
 
     for i in range(num_clusters):
         ax.plot(cluster_means_[i, 0], cluster_means_[i, 1], 'x', markersize=12, label=text_labels[i]+r' $\mu$', color=label_colors[i])
