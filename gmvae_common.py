@@ -45,15 +45,15 @@ def plot_latent_space_with_clusters_training(samples, labels, num_clusters, clus
     markers = ['o', '^', "s", "d", "+", "*", "v", "x", "H", "p", "D", "P", "X"]
     # assert(len(markers) >= len(text_labels))
 
+    outcome_names = {0: 'Capture', 1: 'Escape', 2: 'Miss'}
+    outcome_colors = {0: 'C2', 1: 'C3', 2: 'C4'}
+
     unique_labels = torch.unique(labels)
-    # print(len(unique_labels))
-    for i in range(len(unique_labels)):
-        # print(i)
-        this_label = unique_labels[i]
+    for i, this_label in enumerate(unique_labels):
+        label_id = int(this_label)
         samples_i = samples_[labels == this_label]
         if samples_i.shape[0] > 0:
-            outcome_labels = ['Capture', 'Escape', 'Miss']
-            ax.scatter(samples_i[:, 0], samples_i[:, 1], marker=markers[i], s=50, label=outcome_labels[int(this_label)], color=f'C{int(this_label) + 2}')
+            ax.scatter(samples_i[:, 0], samples_i[:, 1], marker=markers[i % len(markers)], s=50, label=outcome_names.get(label_id, f'Outcome {label_id}'), color=outcome_colors.get(label_id, f'C{(i + 2) % 10}'))
 
     for i in range(num_clusters):
         ax.plot(cluster_means_[i, 0], cluster_means_[i, 1], 'x', markersize=12, label=text_labels[i]+r' $\mu$', color=label_colors[i])
